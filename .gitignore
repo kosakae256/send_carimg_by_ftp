@@ -1,0 +1,6 @@
+car_detection_on_camera/config.ini
+.venv
+car_detection_on_camera/secret
+car_detection_on_camera/tmp
+car_detection_on_camera/modules/__pycache__
+car_detection_on_camera/models
