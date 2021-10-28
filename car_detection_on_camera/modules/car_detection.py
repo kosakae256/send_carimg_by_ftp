@@ -1,34 +1,51 @@
 # 車検出モデルを動かす
-from keras.models import load_model
+from efficientnet_pytorch import EfficientNet
+import torch
+import torch.nn as nn
+import glob
+import torchvision.transforms as transforms
 import cv2
 import numpy as np
 import os
+from PIL import Image
 
+torch.backends.cudnn.banchmark = True
 filepath = os.path.dirname(os.path.abspath(__file__))
 
 class CarDetection():
     def __init__(self):
         self.labels = ["exist","nothing"]
-        model_path = f"{filepath}/../models/exist_or_nothing.h5"
-        self.model = load_model(model_path)
+        model_path = f"{filepath}/../models/exist_or_nothing_v3.pth"
+        self.device = torch.device("cuda")
+
+        print(self.device)
+
+        self.model = EfficientNet.from_pretrained("efficientnet-b0")
+        num_ftrs = self.model._fc.in_features
+        self.model._fc = nn.Linear(num_ftrs, 2)
+        self.model.load_state_dict(torch.load(model_path))
+        self.model.eval()
+        self.model.cuda()
+        self.model = self.model.to(self.device,non_blocking=True)
+
+        self.transform = transforms.Compose([transforms.Resize((224,224)),transforms.ToTensor()])
 
     def detect(self,img_from_camera):
-        # 299x299にreshape
-        x = cv2.resize(img_from_camera,(299,299))
-        # 配列に新しい次元を追加する
-        x = np.expand_dims(x, axis=0)
-        # 色を0~1までの値に変換
-        x = x / 255
-
-        # 推論
-        result = self.model.predict(x)[0][0]
-        print(result)
+        x = Image.fromarray(img_from_camera)
+        x = self.transform(x)
+        data = x.to(self.device, non_blocking=True).unsqueeze(0)
+        output = self.model(data)
+        c = int(output.argmax())
+        print(output)
+        print(self.labels[c])
+         
         # 車なし
-        if result<=0.4:
+        if self.labels[c] == "nothing":
             return False
         # 車あり
         else:
             return True
+
 
 if __name__ == "__main__":
     car_detection = CarDetection()
